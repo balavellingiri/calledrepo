@@ -1,0 +1,35 @@
+name: Resuseable-workflow
+
+on:
+  workflow_call:
+    inputs:
+      os-type:
+        required: true
+        type: string
+
+jobs:
+  Build:
+    runs-on: ${{ inputs.os-type }}
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v1
+      - name: Creating Cache
+        uses: actions/cache@v1
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-key: |
+            ${{ runner.os }}-node-
+      - name: Environment setup
+        uses: actions/setup-node@v1
+        with:
+          node-version: "16.x"
+      - name: Install Node dependencies
+        run: npm ci
+      - name: Build the App
+        run: npm run build
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          path: build
+          name: build

@@ -1,0 +1,143 @@
+name: Resuseable-workflow
+
+on:
+  workflow_call:
+    inputs:
+      os-type:
+        required: true
+        type: string
+      dev-url:
+        required: true
+        description: this is used for specifying the endpoint of the dev app
+        type: string
+      stage-url:
+        required: false
+        description: this is used for specifying the endpoint of the dev app
+        type: string
+      prod-url:
+        required: false
+        description: this is used for specifying the endpoint of the dev app
+        type: string
+    secrets:
+      SURGE_LOGIN:
+        required: true
+      SURGE_TOKEN:
+        required: true
+
+
+jobs:
+
+  job1:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: echo "::set-output name=matrix::{\"include\":[{\"env\":\"dev\"},{\"project\":\"bar\",\"config\":\"Release\"}]}"
+  
+  Deploy:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: ["Build"]
+    environment:
+      name: development
+      url: ${{ inputs.dev-url }}
+    env:
+      SURGE_LOGIN: ${{ secrets.SURGE_LOGIN }}
+      SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v1
+      - name: Creating Cache
+        uses: actions/cache@v1
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      - name: Environment setup
+        uses: actions/setup-node@v1
+        with:
+          node-version: "16.x"
+      - name: Install Node dependencies
+        run: npm ci
+      - name: Build the App
+        run: npm run build
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          path: build
+          name: build
+      - name: Deploy the app
+        run: npx surge --project ./build --domain ${{ inputs.dev-url }}
+  
+  Deploy-Staging:
+    runs-on: ${{ inputs.os-type }}
+    if: github.event.ref == 'refs/heads/main' || github.ref_type == 'tag'
+    needs: ["Build"]
+    environment:
+      name: staging
+      url: ${{ inputs.stage-url }}
+    env:
+      SURGE_LOGIN: ${{ secrets.SURGE_LOGIN }}
+      SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v1
+      - name: Creating Cache
+        uses: actions/cache@v1
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      - name: Environment setup
+        uses: actions/setup-node@v1
+        with:
+          node-version: "16.x"
+      - name: Install Node dependencies
+        run: npm ci
+      - name: Build the App
+        run: npm run build
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          path: build
+          name: build
+      - name: Deploy the app
+        run: npx surge --project ./build --domain ${{ inputs.stage-url }}
+  
+  Deploy-Production:
+    runs-on: ${{ inputs.os-type }}
+    needs: ["Deploy-staging"]
+    environment:
+      name: production
+      url: ${{ inputs.prod-url }}
+    env:
+      SURGE_LOGIN: ${{ secrets.SURGE_LOGIN }}
+      SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v1
+      - name: Creating Cache
+        uses: actions/cache@v1
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      - name: Environment setup
+        uses: actions/setup-node@v1
+        with:
+          node-version: "16.x"
+      - name: Install Node dependencies
+        run: npm ci
+      - name: Build the App
+        run: npm run build
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          path: build
+          name: build
+      - name: Deploy the app
+        run: npx surge --project ./build --domain ${{ inputs.prod-url }}
