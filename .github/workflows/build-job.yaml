@@ -3,13 +3,13 @@ name: Resuseable-workflow
 on:
   workflow_call:
     inputs:
-      os-type:
+      ostype:
         required: true
         type: string
 
 jobs:
   Build:
-    runs-on: ${{ inputs.os-type }}
+    runs-on: ${{ inputs.ostype }}
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v1
